@@ -1,0 +1,246 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "metadata": {
+      "_generator": {
+        "name": "bicep",
+        "version": "0.9.1.41621",
+        "templateHash": "15786782819334758462"
+      }
+    },
+    "parameters": {
+      "VMName": {
+        "type": "string"
+      },
+      "vmResourceGroup": {
+        "type": "string"
+      },
+      "subnetName": {
+        "type": "string",
+        "defaultValue": "snet-apps",
+        "metadata": {
+          "description": "Select the subnet the VM should be deployed to - you need to select the correct subscription for the correspnding VNet and Subnet"
+        }
+      },
+      "adminUsername": {
+        "type": "string",
+        "defaultValue": "adm-local",
+        "metadata": {
+          "description": "Local administrator username"
+        }
+      },
+      "adminPassword": {
+        "type": "secureString",
+        "metadata": {
+          "description": "Password for the local administrator"
+        }
+      },
+      "VMSize": {
+        "type": "string",
+        "defaultValue": "Standard_D2as_v5",
+        "allowedValues": [
+          "Standard_B2s",
+          "Standard_B2ms",
+          "Standard_B8ms",
+          "Standard_B12ms",
+          "Standard_B16ms",
+          "Standard_D2s_v5",
+          "Standard_D4s_v5",
+          "Standard_D8s_v5",
+          "Standard_D16s_v5",
+          "Standard_E2s_v5",
+          "Standard_E4s_v5",
+          "Standard_E8s_v5",
+          "Standard_E2as_v5",
+          "Standard_E4as_v5",
+          "Standard_E8as_v5",
+          "Standard_E16as_v5",
+          "Standard_E16s_v5",
+          "Standard_D2as_v5",
+          "Standard_D4as_v5",
+          "Standard_D8as_v5",
+          "Standard_D16as_v5"
+        ],
+        "metadata": {
+          "description": "Select the virtual machine size. B-Series: VMs are ideal for workloads that dont need the full performance of the CPU continuously, D-Series: General purpose VM sizes provide balanced CPU-to-memory ratio, E-Series: Memory optimized VM sizes offer a high memory-to-CPU ratio that is great for relational database servers, medium to large caches, and in-memory analytics, All VMs with a letter \"a\" are backed by AMD CPU which bring better cost to performance ratio."
+        }
+      },
+      "Image": {
+        "type": "string",
+        "defaultValue": "2022-datacenter-azure-edition",
+        "allowedValues": [
+          "2019-datacenter-gensecond",
+          "2019-datacenter-smalldisk-g2",
+          "2022-datacenter-azure-edition",
+          "2022-datacenter-azure-edition-smalldisk"
+        ],
+        "metadata": {
+          "description": "Select the virtual machine Image"
+        }
+      },
+      "customerId": {
+        "type": "string",
+        "defaultValue": ""
+      },
+      "owner": {
+        "type": "string",
+        "defaultValue": ""
+      },
+      "tagsNAutoUpdate": {
+            "type": "object",
+            "defaultValue": {
+                "customerId":"[parameters('customerId')]",
+                "Owner": "[parameters('owner')]"
+                }
+      },
+      "tagsAutoUpdate": {
+            "type": "object",
+            "defaultValue": {
+                "customerId":"[parameters('customerId')]",
+                "Owner": "[parameters('owner')]",
+                "Updatemanagement": "[parameters('updateSchedule')]"
+                }
+      },
+      "enableBackup": {
+          "type": "bool"
+      },
+      "vaultName": {
+          "type": "String",
+          "defaultValue": ""
+      },
+      "vaultRG": {
+          "type": "String",
+          "defaultValue": ""
+      },
+      "backupPolicyName": {
+          "type": "String",
+          "defaultValue": ""
+      },
+      "autoUpdate": {
+          "type": "bool",
+          "defaultValue": false
+      },
+      "updateSchedule": {
+          "type": "string",
+          "defaultValue": ""
+      },
+      "hybridBenefit": {
+          "type": "bool",
+          "defaultValue": false
+      }
+    },
+     "variables": {
+      "vmName": "[format(parameters('VMName'))]",
+      "vaultName": "[format(parameters('vaultName'))]",
+      "vaultRG": "[format(parameters('vaultRG'))]",
+      "backupFabric": "Azure",
+      "backupPolicyName": "[format(parameters('backupPolicyName'))]",
+      "protectionContainer": "[format('iaasvmcontainer;iaasvmcontainerv2;{0};{1}', resourceGroup().name, variables('vmName'))]",
+      "protectedItem": "[format('vm;iaasvmcontainerv2;{0};{1}', resourceGroup().name, variables('vmName'))]"      
+    },   
+    "resources": [
+      {
+        "type": "Microsoft.Network/networkInterfaces",
+        "apiVersion": "2021-03-01",
+        "name": "[format('{0}-nic0', parameters('VMName'))]",
+        "location": "[resourceGroup().location]",
+        "properties": {
+          "ipConfigurations": [
+            {
+              "name": "ipconfig1",
+              "properties": {
+                "subnet": {
+                  "id": "[format('{0}', parameters('subnetName'))]"
+                },
+                "privateIPAllocationMethod": "Dynamic"
+              }
+            }
+          ]
+        },
+        "tags": "[parameters('tagsNAutoUpdate')]"
+      },
+      {
+        "type": "Microsoft.Compute/virtualMachines",
+        "apiVersion": "2021-07-01",
+        "name": "[parameters('VMName')]",
+        "location": "[resourceGroup().location]",
+        "properties": {
+          "hardwareProfile": {
+            "vmSize": "[parameters('VMSize')]"
+          },
+          "licenseType": "[if(parameters('hybridBenefit'), 'Windows_Server', 'None')]",
+          "osProfile": {
+            "adminPassword": "[parameters('adminPassword')]",
+            "adminUsername": "[parameters('adminUsername')]",
+            "computerName": "[parameters('VMName')]",
+            "windowsConfiguration": {
+              "enableAutomaticUpdates": "[if(parameters('autoUpdate'), 'true', 'false')]",
+              "timeZone": "W. Europe Standard Time"
+            }
+          },
+          "networkProfile": {
+            "networkInterfaces": [
+              {
+                "properties": {
+                  "primary": true
+                },
+                "id": "[resourceId('Microsoft.Network/networkInterfaces', format('{0}-nic0', parameters('VMName')))]"
+              }
+            ]
+          },
+          "storageProfile": {
+            "imageReference": {
+              "publisher": "MicrosoftWindowsServer",
+              "offer": "WindowsServer",
+              "sku": "[parameters('Image')]",
+              "version": "latest"
+            },
+            "osDisk": {
+              "createOption": "FromImage",
+              "name": "[format('{0}-disk0', parameters('VMName'))]"
+            }
+          }
+        },
+        "tags": "[if(parameters('autoUpdate'), parameters('tagsAutoUpdate'), parameters('tagsNAutoUpdate'))]",
+        "dependsOn": [
+          "[resourceId('Microsoft.Network/networkInterfaces', format('{0}-nic0', parameters('VMName')))]"
+        ]
+      },
+      {
+            "condition": "[parameters('enableBackup')]",
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2021-04-01",
+            "name": "nestedTemplateBackupPolicyAssigment",
+            "resourceGroup": "[variables('vaultRG')]",
+            "properties": {
+                "mode": "Incremental",
+                "template": {
+                    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {},
+                    "variables": {},
+                    "resources": [
+                        {
+                          "type": "Microsoft.RecoveryServices/vaults/backupFabrics/protectionContainers/protectedItems",
+                          "apiVersion": "2021-04-01",
+                          "name": "[format('{0}/{1}/{2}/{3}', variables('vaultName'), variables('backupFabric'), variables('protectionContainer'), variables('protectedItem'))]",
+                          "properties": {
+                              "protectedItemType": "Microsoft.Compute/virtualMachines",
+                              "policyId": "[variables('backupPolicyName')]",
+                              "sourceResourceId": "[resourceId('Microsoft.Compute/virtualMachines', variables('vmName'))]",
+                              "extendedProperties": ""
+                          }
+
+                        }
+                    ]
+                },
+                "parameters": {}                
+              },
+              "dependsOn": [
+                  "[resourceId('Microsoft.Compute/virtualMachines', variables('vmName'))]"
+              ]
+        }
+    
+      
+    ]
+  }
